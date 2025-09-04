@@ -1,18 +1,60 @@
 #include <Arduino.h>
+#include <ArduinoJson.h>
+#include <Wire.h>
+#include <Adafruit_Sensor.h>
+#include <Adafruit_BMP280.h>
 
-// put function declarations here:
-int myFunction(int, int);
+Adafruit_BMP280 bmp;
 
-void setup() {
-  // put your setup code here, to run once:
-  int result = myFunction(2, 3);
+void lerBMP280(JsonObject &leituraSensores)
+{
+  Serial.println("BMP280:");
+  Serial.print("Temperatura : ");
+  Serial.print(bmp.readTemperature());
+  Serial.println(" *C");
+
+  Serial.print("Pressao : ");
+  Serial.print(bmp.readPressure());
+  Serial.println(" Pa");
+
+  Serial.print("Altitude : ");
+  Serial.print(bmp.readAltitude());
+  Serial.println(" m");
+  Serial.println(" ");
+
+  leituraSensores["temperatura"] = bmp.readTemperature();
+  leituraSensores["pressao"] = bmp.readPressure();
+  leituraSensores["altitude"] = bmp.readAltitude(1013.25);
 }
 
-void loop() {
-  // put your main code here, to run repeatedly:
+void setup()
+{
+  Serial.begin(115200);
+  delay(1000);
+
+  if (!bmp.begin())
+  {
+    Serial.println("Cannot connect to BMP280");
+    // while (1)
+  }
 }
 
-// put function definitions here:
-int myFunction(int x, int y) {
-  return x + y;
+void loop()
+{
+  StaticJsonDocument<512> jsonLeitura;
+
+  JsonObject leituraSensores = jsonLeitura.to<JsonObject>();
+
+  currentTime = millis();
+
+  if (currentTime - lastTime > 2000)
+  {
+
+    lerBMP280(leituraSensores);
+
+    Serial.println();
+    delay(1000);
+
+    lastTime = millis();
+  }
 }
