@@ -39,6 +39,8 @@ void setup()
   }
 }
 
+long currentTime, lastTime;
+
 void loop()
 {
   StaticJsonDocument<512> jsonLeitura;
