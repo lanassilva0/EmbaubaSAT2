@@ -17,6 +17,7 @@
 #include "ScioSense_ENS160.h"
 #include "MPU9250.h"
 #include <MQUnifiedsensor.h>
+#include <Adafruit_INA219.h>
 
 #define placa "Arduino UNO"
 #define Voltage_Resolution 5
@@ -34,6 +35,26 @@ ScioSense_ENS160 ens;
 // MPU9250 mpu;
 MPU9250Setting setting;
 Adafruit_MPU6050 mpu;
+Adafruit_INA219 ina219;
+
+// Variáveis para a leitura da bateria
+const float capacidadeBateria = 2000.0;
+const float tensaoMax = 4.2;
+const float tensaoMin = 3.0;
+
+float corrente = 0.0, potencia = 0.0, tensao = 0.0;
+float quedaTensao = 0.0, tensaoEntrada = 0.0;
+
+float SoC = 100.0;
+float cargaConsumida = 0.0;
+float consumoMedio = 0.0;
+float tempoRestante = 0.0;
+
+unsigned long ultimaAtualizacao = 0;
+const int numLeituras = 10;
+float historicoCorrente[numLeituras];
+int indiceLeitura = 0;
+bool historicoCompleto = false;
 
 // Micro SD Card
 //  * MicroSD VCC pin to ESP32 +5V
@@ -435,6 +456,59 @@ void lerMQ135()
 }
 // MQ135 - FIM
 
+void lerINA(JsonObject &leituraSensores)
+{
+  tensao = ina219.getBusVoltage_V();
+  quedaTensao = ina219.getShuntVoltage_mV() / 1000.0;
+  corrente = ina219.getCurrent_mA();
+  potencia = ina219.getPower_mW();
+  tensaoEntrada = tensao + quedaTensao;
+
+  historicoCorrente[indiceLeitura] = abs(corrente);
+  indiceLeitura++;
+
+  if (indiceLeitura >= numLeituras)
+  {
+    indiceLeitura = 0;
+    historicoCompleto = true;
+  }
+
+  consumoMedio = 0.0;
+  int leiturasValidas = historicoCompleto ? numLeituras : indiceLeitura;
+
+  for (int i = 0; i < leiturasValidas; i++)
+  {
+    consumoMedio += historicoCorrente[i];
+  }
+
+  consumoMedio = (consumoMedio / leiturasValidas);
+
+  unsigned long agora = millis();
+  float deltaT = (agora - ultimaAtualizacao) / 3600000.0;
+  ultimaAtualizacao = agora;
+
+  cargaConsumida = cargaConsumida + abs(corrente) * deltaT;
+  SoC = constrain(100.0 - ((cargaConsumida / capacidadeBateria) * 100.0), 0.0, 100.0);
+
+  if (historicoCompleto && consumoMedio > 0.1)
+  {
+    float cargaRestante = capacidadeBateria * (SoC / 100.0);
+    tempoRestante = cargaRestante / consumoMedio;
+  }
+  else
+  {
+    tempoRestante = 0.0;
+  }
+
+  leituraSensores["tensao"] = tensaoEntrada;
+  leituraSensores["corrente"] = corrente;
+  leituraSensores["potencia"] = potencia;
+  leituraSensores["soc"] = SoC;
+  leituraSensores["carga_consumida"] = cargaConsumida;
+  leituraSensores["consumo_medio"] = consumoMedio;
+  leituraSensores["tempo_restante"] = tempoRestante;
+}
+
 void setup()
 {
 
@@ -470,6 +544,20 @@ void setup()
     writeFile("/test.txt", "Testando escrita no cartão SD");
     readFile("/test.txt");
   }
+
+  if (!ina219.begin())
+  {
+    Serial.println("INA219 não encontrado");
+    while (1)
+      ;
+  }
+
+  ina219.setCalibration_32V_2A();
+
+  for (int i = 0; i < numLeituras; i++)
+  {
+    historicoCorrente[i] = 0.0;
+  }
 }
 
 long currentTime, lastTime;
@@ -501,6 +589,7 @@ void loop()
     lerMPU6050(leituraSensores);
     Serial.println("ENS160 na placa:");
     lerENS160(leituraSensores);
+    lerINA(leituraSensores);
     // lerMQ135();
 
     saveEEPROM(jsonLeitura);
