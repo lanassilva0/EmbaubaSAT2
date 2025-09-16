@@ -11,7 +11,7 @@
 #define EPPROM_SIZE 512
 #define EEPROM_ADDR 0
 
-#define SS 18   // GPIO18 CS
+#define SS 15   // GPIO18 CS
 #define RST 14  // GPIO14 RESET
 #define DI00 26 // GPIO26 IRQ(Interrupt Request)
 #include "ScioSense_ENS160.h"
@@ -64,10 +64,10 @@ bool historicoCompleto = false;
 //  * MicroSD SCK pin to ESP32 GPIO18
 //  * MicroSD CS pin to ESP32 GPIO5
 
-const int MICROSD_PIN_CS = 5;    // Pino serial
-const int MICROSD_PIN_MOSI = 23; // Pino serial
-const int MICROSD_PIN_MISO = 19; // Pino serial
-const int MICROSD_PIN_SCK = 18;  // Clock pin
+const int MICROSD_PIN_CS = 15; // Pino serial
+// const int MICROSD_PIN_MOSI = 23; // Pino serial
+// const int MICROSD_PIN_MISO = 19; // Pino serial
+// const int MICROSD_PIN_SCK = 18;  // Clock pin
 
 File myFile;
 
